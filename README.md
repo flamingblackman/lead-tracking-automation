@@ -1,8 +1,57 @@
-# Real Estate Lead Tracking & Listing Alert Automation
+<div align="center">
 
-A no-code pipeline (with a custom JavaScript step) that watches Gmail for property listing emails, parses them into structured data, and logs each one as a row in Google Sheets.
+# 🏠 Real Estate Lead Tracking & Listing Alert Automation
 
-Status: the Zap is currently paused (Zapier trial expired). This repo documents the build as implemented.
+**One listing email in. One clean row in Google Sheets. No refreshing, no missed leads.**
+
+[![Zapier](https://img.shields.io/badge/Zapier-No--code%20automation-FF4A00?style=flat&logo=zapier&logoColor=white)](https://zapier.com)
+[![Gmail](https://img.shields.io/badge/Gmail-Trigger-EA4335?style=flat&logo=gmail&logoColor=white)](https://mail.google.com)
+[![Google Sheets](https://img.shields.io/badge/Google%20Sheets-Logging%20layer-34A853?style=flat&logo=googlesheets&logoColor=white)](https://sheets.google.com)
+[![Status](https://img.shields.io/badge/Status-Paused%20—%20Zapier%20trial%20expired-lightgrey?style=flat)](https://zapier.com)
+
+</div>
+
+## What it does in 10 seconds
+
+Zillow and StreetEasy send listing alerts by email. This Zapier pipeline catches each alert in Gmail, pulls the address, rent, broker, phone, email, and listing link out of it with AI-generated JavaScript (regex pattern-matching, not a live AI call), and logs it as one row in Google Sheets with a status. No dashboard to refresh, no lead lost in the inbox.
+
+## How it flows
+
+```mermaid
+flowchart LR
+    A[📬 Zillow / StreetEasy<br/>alert email] --> B[🔍 Gmail trigger<br/>searches every 15 min]
+    B --> C[🧩 Code by Zapier<br/>AI-generated JavaScript<br/>regex parsing]
+    C --> D[📋 Structured fields<br/>address · rent · broker<br/>phone · email · URL]
+    D --> E[📊 Google Sheets<br/>add one row]
+    E --> F[✅ Update row<br/>Status column]
+
+    classDef mail fill:#EA4335,color:#fff,stroke:#B31412
+    classDef zap fill:#FF4A00,color:#fff,stroke:#C23A00
+    classDef sheet fill:#34A853,color:#fff,stroke:#1E7A34
+    class A,B mail
+    class C,D zap
+    class E,F sheet
+```
+
+## The pipeline at a glance
+
+| Step | Tool | What happens | Output |
+| --- | --- | --- | --- |
+| 1. Trigger | Gmail | Watches for Zillow / StreetEasy alert emails by sender search, polls every 15 min | Matching email fires the Zap |
+| 2. Parse | Code by Zapier | AI-generated JavaScript extracts fields from subject + body with regex | Clean, structured listing data |
+| 3. Log | Google Sheets | Adds one row per alert | Row in the tracker sheet |
+| 4. Status | Google Sheets | Updates the new row's Status column | Row marked with its status |
+
+## What lands in the Sheet
+
+Mock data, showing the real columns and shape:
+
+| Date Contacted | Property Address | Rent Amount | Source | Broker Name & Contact | Listing URL | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-09-28 | 123 Example Ave, Brooklyn, NY | $2,400 | StreetEasy | Jane Doe — 555-010-0000 | View Listing | Status |
+| 2026-09-28 | 456 Sample St, Queens, NY | $1,850 | Zillow | N/A | View Listing | Status |
+
+> The update step writes the literal text `Status` today — real status values (new / updated / off market) are part of the planned dedup build below, not live yet.
 
 ## The Problem
 
@@ -12,26 +61,18 @@ Monitoring Zillow and StreetEasy listings manually means refreshing pages, missi
 
 Neither Zillow nor StreetEasy offers a public API or a native Zapier trigger for listings. So the pipeline starts with what exists: email.
 
-## Architecture
-
-```mermaid
-flowchart TD
-    A[Zillow / StreetEasy alert email arrives in Gmail] --> B[Gmail trigger: search for listing emails, checked every 15 min]
-    B --> C[Code by Zapier: custom JavaScript parsing step]
-    C --> D[Structured fields: address, rent, broker, phone, email, URL]
-    D --> E[Google Sheets: add row]
-    E --> F[Google Sheets: update the new row's Status column]
-```
-
 ## Pipeline Stages
 
 ### 1. Trigger — Gmail Search
+
 A Gmail trigger watches for incoming Zillow/StreetEasy alert emails via search query (StreetEasy and Zillow sender addresses). It polls every 15 minutes. Every matching email fires the workflow — no polling a dashboard, no manual checks.
 
-### 2. Parsing — Custom JavaScript (Code by Zapier)
-Listing emails are HTML and inconsistent. A custom JavaScript step extracts fields from the email subject and body with regex pattern-matching and normalizes them into clean, structured output. This is the most technical part of the build: the script handles messy real-world email formatting so downstream steps always receive predictable data. It is pattern-matching, not a live AI call.
+### 2. Parsing — AI-generated JavaScript (Code by Zapier)
+
+Listing emails are HTML and inconsistent. An AI-generated JavaScript step extracts fields from the email subject and body with regex pattern-matching and normalizes them into clean, structured output. This is the most technical part of the build: the script handles messy real-world email formatting so downstream steps always receive predictable data. It is pattern-matching, not a live AI call.
 
 Extracted fields:
+
 - `propertyAddress`: subject with prefixes like "You've contacted", "New listing:", "Listed:", "Property:", and "You Sent a Message About" stripped, then trimmed.
 - `rentAmount`: a "$X,XXX base rent" match first; otherwise the first dollar amount between $500 and $10,000 in the body.
 - `brokerInfo`: broker name from "Listed by" / "Listing by" combined with phone or email; 'N/A' when nothing is found.
@@ -40,6 +81,7 @@ Extracted fields:
 - `listingUrl`: StreetEasy building link first, otherwise a Zillow homedetails link.
 
 ### 3. Logging — Google Sheets (Add Row + Update Row)
+
 Parsed data lands in a Google Sheet. Every matching email adds one row; the workflow then updates that same new row's Status column.
 
 | Parsed field | Sheet column | Notes |
@@ -53,6 +95,7 @@ Parsed data lands in a Google Sheet. Every matching email adds one row; the work
 | Status | `Status` | Set on the new row by the update step |
 
 ### 4. Current limitation — no dedup yet
+
 The live build does not dedup on listing ID: repeat alerts for the same listing create repeat rows, because there is no lookup step and no branching. The planned next step is a lookup (match on listing ID, update the existing row, otherwise add a row) with real status values (new / updated / off_market). Until that step is built, the sheet needs periodic manual cleanup of repeats.
 
 ## Sample Payload
@@ -67,10 +110,18 @@ See `docs/runbook.md` for deployment, maintenance, and troubleshooting notes.
 
 This repository contains **mock data only**. No real names, emails, phone numbers, or listing details are included. The sample payload uses clearly synthetic values.
 
+## How this was built
+
+An AI-assisted automation build. Bryan Francis designed the pipeline, directed the build, and verified the output. Zapier's AI generated the JavaScript parsing step — he did not hand-write it. The build is a no-code Zapier pipeline with one AI-generated code step.
+
 ## Skills Demonstrated
 
 - No-code systems architecture (Zapier)
 - Gmail as an event trigger / ingestion layer
-- Custom JavaScript for regex-based data parsing and normalization (Code by Zapier)
+- AI-generated JavaScript for regex-based data parsing and normalization (Code by Zapier)
 - Google Sheets as a lightweight logging layer
 - Technical documentation and runbook authoring
+
+---
+
+**Status:** the Zap is currently paused (Zapier trial expired). Re-enabling needs a paid Zapier plan, since the JavaScript step is a paid feature. This repo documents the build as implemented.
