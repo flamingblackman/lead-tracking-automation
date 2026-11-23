@@ -42,6 +42,8 @@ flowchart LR
 | 3. Log | Google Sheets | Adds one row per alert | Row in the tracker sheet |
 | 4. Status | Google Sheets | Updates the new row's Status column | Row marked with its status |
 
+Dedup is not a Zap step. It runs in the sheet — see `dedup.gs`.
+
 ## What lands in the Sheet
 
 Mock data, showing the real columns and shape:
@@ -51,7 +53,7 @@ Mock data, showing the real columns and shape:
 | 2026-09-28 | 123 Example Ave, Brooklyn, NY | $2,400 | StreetEasy | Jane Doe — 555-010-0000 | View Listing | Status |
 | 2026-09-28 | 456 Sample St, Queens, NY | $1,850 | Zillow | N/A | View Listing | Status |
 
-> The update step writes the literal text `Status` today — real status values (new / updated / off market) are part of the planned dedup build below, not live yet.
+> The update step writes the literal text `Status` today — real status values (new / updated / off market) are not live yet. The sheet-side dedup script removes repeat rows but does not set status values.
 
 ## The Problem
 
@@ -94,9 +96,9 @@ Parsed data lands in a Google Sheet. Every matching email adds one row; the work
 | Listing URL | `Listing URL` | Link to source listing, shown as "View Listing" |
 | Status | `Status` | Set on the new row by the update step |
 
-### 4. Current limitation — no dedup yet
+### 4. Dedup — sheet-side (Apps Script)
 
-The live build does not dedup on listing ID: repeat alerts for the same listing create repeat rows, because there is no lookup step and no branching. The planned next step is a lookup (match on listing ID, update the existing row, otherwise add a row) with real status values (new / updated / off_market). Until that step is built, the sheet needs periodic manual cleanup of repeats.
+The Zap still has no lookup step: repeat alerts for the same listing create repeat rows when they land. Dedup happens in the sheet instead, with `dedup.gs` (Google Apps Script, installed on the tracker sheet). It matches on the normalized Property Address (lowercase, punctuation stripped), keeps the first row per address, deletes later duplicates, and copies each removed row to a "Dedup Log" sheet first. Different units at the same building stay separate rows; blank or "undisclosed" addresses are never deleted. A lookup step inside Zapier (match on listing ID, update the existing row, otherwise add a row) remains unbuilt — it needs a paid Zapier plan. Until `dedup.gs` is installed on the tracker sheet, repeat rows still need periodic manual cleanup.
 
 ## Sample Payload
 
@@ -125,3 +127,5 @@ An AI-assisted automation build. Bryan Francis designed the pipeline, directed t
 ---
 
 **Status:** the Zap is currently paused (Zapier trial expired). Re-enabling needs a paid Zapier plan, since the JavaScript step is a paid feature. This repo documents the build as implemented.
+
+**Dedup:** `dedup.gs` (Google Apps Script) is in this repo; install on the tracker sheet is pending.
